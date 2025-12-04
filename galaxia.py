@@ -1,32 +1,20 @@
 import OpenGL.GL as gl
 import OpenGL.GLUT as glut
 import random
-import math
 
-class Estrela():
-   def __init__(self, x, y, cor, raio):
-      self.x = x
-      self.y = y
-      self.cor = cor
-      self.raio = raio
+from geracao_eventos import gerar_evento_raro
+from estrelas import Estrela, desenharEstrela, atualizar_brilho
 
-estrelas = [
-   Estrela(-0.6, 0.7, [random.uniform(0, 1) for _ in range(3)], random.uniform(0.01, 0.05)),
-   Estrela(-0.4, 0.3, [random.uniform(0, 1) for _ in range(3)], random.uniform(0.01, 0.05)),
-   Estrela(-0.1, 0.0, [random.uniform(0, 1) for _ in range(3)], random.uniform(0.01, 0.05)),
-   Estrela(0.3, -0.3, [random.uniform(0, 1) for _ in range(3)], random.uniform(0.01, 0.05)),
-   Estrela(-0.2, -0.5, [random.uniform(0, 1) for _ in range(3)], random.uniform(0.01, 0.05)),
-   Estrela(-0.7, 0, [random.uniform(0, 1) for _ in range(3)], random.uniform(0.01, 0.05)),
-   Estrela(0.1, 0.2, [random.uniform(0, 1) for _ in range(3)], random.uniform(0.01, 0.05)),
-]
+estrelas = []
 
-estrelas_originais = estrelas.copy()
-dark_mode = False
+num_eventos = {
+    "COMUM": 0,
+    "GIGANTE": 0,
+    "SUPERMASSIVA": 0,
+    "SUPERNOVA": 0
+}
 
 # Fundo galáctico: criando várias estrelas aleatórias
-NUM_ESTRELAS_FUNDO = 120
-estrelas_fundo = [(random.uniform(-1.2, 1.2), random.uniform(-1.2, 1.2)) for _ in range(NUM_ESTRELAS_FUNDO)]
-
 def desenharFundoGalaxia():
     left, right, bottom, top = ortho_vals
     
@@ -43,54 +31,92 @@ def desenharFundoGalaxia():
     gl.glBegin(gl.GL_POINTS)
     gl.glColor3f(1.0, 1.0, 1.0)
 
-    for (x, y) in estrelas_fundo:
-        gl.glVertex2f(x * (right-left)/2, y * (top-bottom)/2)
-
     gl.glEnd()
 
-def desenharEstrela(e):
-    if dark_mode:
-        gl.glColor3f(1.0, 1.0, 0.6)
-    else:
-        gl.glColor3f(*e.cor)
-    gl.glBegin(gl.GL_POLYGON)
-    for i in range(30):
-        ang = 2 * math.pi * i / 30
-        dx = math.cos(ang) * e.raio
-        dy = math.sin(ang) * e.raio
-        gl.glVertex2f(e.x + dx, e.y + dy)
+# Desenhando o quadradinho com o contador
+def desenharContador():
+    
+    tamanho = 0.15
+    padding = 0.02
+
+    left, right, bottom, top = ortho_vals
+
+    x0 = left + padding
+    y0 = bottom + padding
+    x1 = x0 + tamanho
+    y1 = y0 + tamanho
+
+    gl.glBegin(gl.GL_QUADS)
+    gl.glColor4f(0.0, 0.0, 0.0, 0.5)
+    gl.glVertex2f(x0, y0)
+    gl.glVertex2f(x1, y0)
+    gl.glVertex2f(x1, y1)
+    gl.glVertex2f(x0, y1)
     gl.glEnd()
 
+    gl.glColor3f(1.0, 1.0, 1.0)
+    gl.glRasterPos2f(x0 + 0.02, y0 + 0.05)
+
+    texto = f"COMUM: {num_eventos['COMUM']}\nGIGANTE: {num_eventos['GIGANTE']}\nSUPERMASSIVA: {num_eventos['SUPERMASSIVA']}\nSUPERNOVA: {num_eventos['SUPERNOVA']}"
+
+    linhas = texto.split("\n")
+    for i, linha in enumerate(linhas):
+        gl.glRasterPos2f(x0 + 0.02, y0 + 0.05 + i*0.03)
+        for c in linha:
+            glut.glutBitmapCharacter(glut.GLUT_BITMAP_HELVETICA_12, ord(c))
+
+# Fazendo o display de tudo na tela
 def display():
     gl.glClear(gl.GL_COLOR_BUFFER_BIT)
     gl.glLoadIdentity()
 
     desenharFundoGalaxia()
 
-    gl.glBegin(gl.GL_LINE_STRIP)
-    for e in estrelas:
-        gl.glVertex2f(e.x, e.y)
-    gl.glEnd()
-
     for e in estrelas:
         desenharEstrela(e)
+
+    desenharContador()
 
     gl.glColor3f(1, 1, 1)
     glut.glutSwapBuffers()
 
+
 def interacoes(key, x, y):
-    global estrelas, dark_mode
+    global estrelas
+
+    # Tecla N para criar estrela
     if key == b'n':
-        pos_x, pos_y = [random.uniform(-1, 1) for _ in range(2)]
-        estrelas.append(Estrela(pos_x, pos_y, [random.uniform(0, 1) for _ in range(3)], random.uniform(0.01, 0.05)))
-    elif key == b'x' and len(estrelas) > 0:
-        index = random.randint(0, len(estrelas) - 1)
-        estrelas.pop(index)
-    elif key == b'r':
-        global estrelas_originais
-        estrelas = estrelas_originais.copy()
-    elif key == b't':
-        dark_mode = not dark_mode
+        evento = gerar_evento_raro()
+        num_eventos[evento] += 1
+
+        if evento == "COMUM":
+            cor = [1.0, 1.0, 0.9]
+            raio = random.uniform(0.0007, 0.002)
+
+        elif evento == "GIGANTE":
+            cor = [0.75, 0.85, 1.0]
+            raio = random.uniform(0.02, 0.035)
+
+        elif evento == "SUPERMASSIVA":
+            cor = [1.0, 0.4, 0.1]
+            raio = random.uniform(0.040, 0.055)
+
+        elif evento == "SUPERNOVA":
+            cor = [1.0, 1.0, 0.2]
+            raio = random.uniform(0.060, 0.080)
+
+        left, right, bottom, top = ortho_vals
+        pos_x = random.uniform(left, right)
+        pos_y = random.uniform(bottom, top)
+
+        nova = Estrela(pos_x, pos_y, cor, raio)
+        estrelas.append(nova)
+
+        glut.glutPostRedisplay()
+
+    # Tecla ESC para sair do programa
+    elif key  == b'\x1b':
+        glut.glutLeaveMainLoop()
 
     glut.glutPostRedisplay()
 
@@ -124,9 +150,13 @@ def reshape(width, height):
 glut.glutInit()
 glut.glutInitDisplayMode(glut.GLUT_DOUBLE | glut.GLUT_RGB)
 
-glut.glutCreateWindow(b'Parte 6 - A Constelacao dos Guardioes')
+glut.glutCreateWindow(b'Geracao procedural de eventos astronomicos')
 
-glut.glutReshapeWindow(720, 720)
+glut.glutFullScreen()
+
+gl.glEnable(gl.GL_BLEND)
+gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
+glut.glutIdleFunc(lambda: (atualizar_brilho(estrelas), glut.glutPostRedisplay()))
 glut.glutDisplayFunc(display)
 glut.glutKeyboardFunc(interacoes)
 glut.glutReshapeFunc(reshape)
